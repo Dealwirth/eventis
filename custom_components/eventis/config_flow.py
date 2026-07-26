@@ -1,4 +1,4 @@
-"""Config flow for Eventis Integration (Open Data)."""
+"""Config flow for Eventis Integration (AllEvents API)."""
 
 import voluptuous as vol
 
@@ -8,6 +8,7 @@ import homeassistant.helpers.config_validation as cv
 
 from .const import (
     DOMAIN,
+    CONF_API_KEY,
     CONF_LATITUDE,
     CONF_LONGITUDE,
     CONF_RADIUS,
@@ -32,6 +33,7 @@ class EventisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         data_schema = vol.Schema(
             {
+                vol.Required(CONF_API_KEY): cv.string,
                 vol.Required(CONF_LATITUDE, default=default_lat): cv.latitude,
                 vol.Required(CONF_LONGITUDE, default=default_lon): cv.longitude,
                 vol.Required(CONF_RADIUS, default=DEFAULT_RADIUS): vol.All(
