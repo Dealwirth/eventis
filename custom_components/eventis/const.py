@@ -1,6 +1,6 @@
-"""Constants for the Local Event Radar integration."""
+"""Constants for the Eventis integration."""
 
-DOMAIN = "local_events"
+DOMAIN = "eventis"
 
 CONF_API_KEY = "api_key"
 CONF_LATITUDE = "latitude"
