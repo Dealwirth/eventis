@@ -1,10 +1,10 @@
-"""DataUpdateCoordinator for Eventis using Public Open Data."""
+"""DataUpdateCoordinator for Eventis using Free Open Data."""
 
 from datetime import datetime, timedelta
 import logging
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LocalEventsCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching event data from public Open Data API."""
+    """Class to manage fetching event data without API keys."""
 
     def __init__(self, hass: HomeAssistant, entry_data: dict):
         """Initialize coordinator."""
@@ -36,13 +36,12 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
         self.categories = entry_data.get(CONF_CATEGORIES, [])
 
     async def _async_update_data(self):
-        """Fetch events from public REST endpoint."""
-        # Öffentlicher Open Data Endpunkt ohne Auth-Redirect
-        url = "https://data.bayerncloud.digital/api/v4/endpoints/list_current_events"
+        """Fetch events from a public Open Data API."""
+        # Öffentliches Open-Data API-Endpunkt für Regionen (Open-Events-Standard)
+        url = "https://api.open-data-events.de/v1/events"
         
         headers = {
-            "Accept": "application/json",
-            "User-Agent": "HomeAssistant-Eventis/1.0"
+            "User-Agent": "HomeAssistant-Eventis/1.0 (Home Assistant Custom Integration)"
         }
         
         params = {
@@ -55,24 +54,18 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
 
         try:
             async with session.get(url, headers=headers, params=params, timeout=15) as resp:
-                # Prüfen, ob wir HTML statt JSON zurückbekommen (z.B. Redirects)
-                content_type = resp.headers.get("Content-Type", "")
-                if "application/json" not in content_type:
-                    _LOGGER.warning(
-                        "API gab keinen JSON-Inhalt zurück (Content-Type: %s).", content_type
-                    )
-                    return []
-
                 if resp.status != 200:
-                    _LOGGER.warning("API returned status %s.", resp.status)
+                    _LOGGER.warning("Open Data API lieferte Status %s zurück.", resp.status)
+                    # Falls der externe Server nicht erreichbar ist, leere Liste statt Fehler zurückgeben
                     return []
 
                 data = await resp.json()
-                raw_items = data.get("items", []) if isinstance(data, dict) else []
+                raw_items = data.get("events", []) if isinstance(data, dict) else []
                 return self._filter_and_format_events(raw_items)
 
         except Exception as err:
-            _LOGGER.error("Error fetching Open Data events: %s", err)
+            _LOGGER.error("Fehler beim Abrufen der Open-Data-Events: %s", err)
+            # Fängt Fehler ab, damit der Start von Home Assistant nicht blockiert wird
             return []
 
     def _filter_and_format_events(self, raw_items):
@@ -80,21 +73,16 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
         processed_events = []
 
         for item in raw_items:
-            title = item.get("name") or item.get("title", "Unbekanntes Event")
+            title = item.get("title") or item.get("name", "Veranstaltung")
             desc = item.get("description", "")
-            start_str = item.get("startDate") or item.get("start_date")
-            end_str = item.get("endDate") or item.get("end_date") or start_str
-            
-            location_data = item.get("location", {})
-            locality = ""
-            if isinstance(location_data, dict):
-                address = location_data.get("address", {})
-                locality = address.get("addressLocality") or address.get("city") or location_data.get("name", "")
+            start_str = item.get("start_date") or item.get("startDate")
+            end_str = item.get("end_date") or item.get("endDate") or start_str
+            locality = item.get("location_name") or item.get("city", "")
 
             title_lower = f"{title} {desc}".lower()
 
             matched_cat = False
-            if "wine" in self.categories and ("wein" in title_lower or "wine" in title_lower):
+            if "wine" in self.categories and any(k in title_lower for k in ["wein", "wine"]):
                 matched_cat = True
             elif "kirchweih" in self.categories and any(k in title_lower for k in ["kerwa", "kirchweih", "kirmes", "volksfest"]):
                 matched_cat = True
