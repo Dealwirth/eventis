@@ -1,10 +1,10 @@
 {
-  "domain": "local_events",
-  "name": "Local Event Radar",
-  "codeowners": ["@yourgithubusername"],
+  "domain": "eventis",
+  "name": "Eventis - Local Event Radar",
+  "codeowners": ["@Dealwirth"],
   "config_flow": true,
-  "documentation": "https://github.com/yourgithubusername/ha-local-events",
+  "documentation": "https://github.com/Dealwirth/eventis",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/yourgithubusername/ha-local-events/issues",
+  "issue_tracker": "https://github.com/Dealwirth/eventis/issues",
   "version": "1.0.0"
 }
