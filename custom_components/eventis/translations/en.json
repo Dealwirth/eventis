@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Local Event Radar Setup",
+        "description": "Configure your location, radius, and event categories. Get a free API Token at https://bayerncloud.digital",
+        "data": {
+          "api_key": "BayernCloud API Key",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "radius": "Search Radius (km)",
+          "categories": "Event Categories to Show"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Reconfigure Local Event Radar",
+        "data": {
+          "radius": "Search Radius (km)",
+          "categories": "Event Categories to Show"
+        }
+      }
+    }
+  }
+}
