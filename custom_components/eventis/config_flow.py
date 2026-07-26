@@ -27,7 +27,6 @@ class EventisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return self.async_create_entry(title="Eventis Local Radar", data=user_input)
 
-        # Standards: Home Assistant Breitengrad/Längengrad als Vorgabe
         default_lat = self.hass.config.latitude
         default_lon = self.hass.config.longitude
 
