@@ -2,7 +2,26 @@
   "config": {
     "step": {
       "user": {
-        "title": "Eventis Configuration"
+        "title": "Eventis Einrichtung",
+        "description": "Konfiguriere deinen Standort, den Suchradius und die Event-Kategorien. Einen kostenlosen API-Schlüssel erhältst du auf https://bayerncloud.digital",
+        "data": {
+          "api_key": "BayernCloud API-Schlüssel",
+          "latitude": "Breitengrad (Latitude)",
+          "longitude": "Längengrad (Longitude)",
+          "radius": "Suchradius (in km)",
+          "categories": "Anzuzeigende Event-Kategorien"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Eventis Einstellungen anpassen",
+        "data": {
+          "radius": "Suchradius (in km)",
+          "categories": "Anzuzeigende Event-Kategorien"
+        }
       }
     }
   }
