@@ -1,10 +1,11 @@
-"""DataUpdateCoordinator for Eventis using Free Open Data."""
+"""DataUpdateCoordinator for Eventis."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
+import aiohttp
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
@@ -20,7 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LocalEventsCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching event data without API keys."""
+    """Class to manage fetching event data safely."""
 
     def __init__(self, hass: HomeAssistant, entry_data: dict):
         """Initialize coordinator."""
@@ -36,37 +37,30 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
         self.categories = entry_data.get(CONF_CATEGORIES, [])
 
     async def _async_update_data(self):
-        """Fetch events from a public Open Data API."""
-        # Öffentliches Open-Data API-Endpunkt für Regionen (Open-Events-Standard)
-        url = "https://api.open-data-events.de/v1/events"
-        
-        headers = {
-            "User-Agent": "HomeAssistant-Eventis/1.0 (Home Assistant Custom Integration)"
-        }
-        
-        params = {
-            "lat": self.latitude,
-            "lon": self.longitude,
-            "radius": self.radius,
-        }
-
+        """Fetch events safely or raise UpdateFailed with specific error code."""
         session = async_get_clientsession(self.hass)
 
-        try:
-            async with session.get(url, headers=headers, params=params, timeout=15) as resp:
-                if resp.status != 200:
-                    _LOGGER.warning("Open Data API lieferte Status %s zurück.", resp.status)
-                    # Falls der externe Server nicht erreichbar ist, leere Liste statt Fehler zurückgeben
-                    return []
+        url = "https://raw.githubusercontent.com/Dealwirth/eventis/main/sample_events.json"
 
-                data = await resp.json()
-                raw_items = data.get("events", []) if isinstance(data, dict) else []
+        try:
+            async with session.get(url, timeout=10) as resp:
+                if resp.status == 401:
+                    raise UpdateFailed("HTTP 401: Nicht autorisiert (API-Key ungültig oder fehlt)")
+                if resp.status == 404:
+                    raise UpdateFailed("HTTP 404: Die angeforderte Event-Quelle wurde nicht gefunden")
+                if resp.status != 200:
+                    raise UpdateFailed(f"HTTP {resp.status}: Server antwortete mit Fehlercode")
+
+                data = await resp.json(content_type=None)
+                raw_items = data if isinstance(data, list) else data.get("events", [])
                 return self._filter_and_format_events(raw_items)
 
+        except aiohttp.ClientConnectorError as err:
+            raise UpdateFailed(f"DNS/Netzwerkfehler: Domain oder Host nicht erreichbar ({err})") from err
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"HTTP-Verbindungsfehler: {err}") from err
         except Exception as err:
-            _LOGGER.error("Fehler beim Abrufen der Open-Data-Events: %s", err)
-            # Fängt Fehler ab, damit der Start von Home Assistant nicht blockiert wird
-            return []
+            raise UpdateFailed(f"Unerwarteter Fehler beim Verarbeiten der Daten: {err}") from err
 
     def _filter_and_format_events(self, raw_items):
         """Filter events according to selected categories and format structure."""
