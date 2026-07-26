@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for Eventis."""
+"""DataUpdateCoordinator for Eventis using AllEvents API."""
 
 from datetime import timedelta
 import logging
@@ -10,6 +10,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN,
+    CONF_API_KEY,
     CONF_LATITUDE,
     CONF_LONGITUDE,
     CONF_RADIUS,
@@ -21,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LocalEventsCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching event data safely."""
+    """Class to manage fetching event data from AllEvents API."""
 
     def __init__(self, hass: HomeAssistant, entry_data: dict):
         """Initialize coordinator."""
@@ -31,6 +32,7 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
+        self.api_key = entry_data.get(CONF_API_KEY)
         self.latitude = entry_data.get(CONF_LATITUDE)
         self.longitude = entry_data.get(CONF_LONGITUDE)
         self.radius = entry_data.get(CONF_RADIUS)
@@ -40,38 +42,57 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
         """Fetch events safely or raise UpdateFailed with specific error code."""
         session = async_get_clientsession(self.hass)
 
-        url = "https://raw.githubusercontent.com/Dealwirth/eventis/main/sample_events.json"
+        # AllEvents API Endpoint (Events in der Nähe nach Lat/Lon)
+        url = "https://api.allevents.in/events/list/"
+
+        headers = {
+            "Ocp-Apim-Subscription-Key": self.api_key,
+            "Accept": "application/json",
+            "User-Agent": "HomeAssistant-Eventis/1.0",
+        }
+
+        params = {
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "radius": self.radius,
+        }
 
         try:
-            async with session.get(url, timeout=10) as resp:
-                if resp.status == 401:
-                    raise UpdateFailed("HTTP 401: Nicht autorisiert (API-Key ungültig oder fehlt)")
+            async with session.get(url, headers=headers, params=params, timeout=15) as resp:
+                if resp.status in (401, 403):
+                    raise UpdateFailed("HTTP 401/403: Ungültiger AllEvents API-Schlüssel")
                 if resp.status == 404:
-                    raise UpdateFailed("HTTP 404: Die angeforderte Event-Quelle wurde nicht gefunden")
+                    raise UpdateFailed("HTTP 404: API Endpoint nicht gefunden")
                 if resp.status != 200:
-                    raise UpdateFailed(f"HTTP {resp.status}: Server antwortete mit Fehlercode")
+                    raise UpdateFailed(f"HTTP {resp.status}: AllEvents Server-Fehler")
 
                 data = await resp.json(content_type=None)
-                raw_items = data if isinstance(data, list) else data.get("events", [])
+                
+                # AllEvents API Antwort-Struktur verarbeiten
+                raw_items = data.get("data", []) if isinstance(data, dict) else []
                 return self._filter_and_format_events(raw_items)
 
         except aiohttp.ClientConnectorError as err:
-            raise UpdateFailed(f"DNS/Netzwerkfehler: Domain oder Host nicht erreichbar ({err})") from err
+            raise UpdateFailed(f"DNS/Netzwerkfehler beim Aufruf von AllEvents: {err}") from err
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"HTTP-Verbindungsfehler: {err}") from err
         except Exception as err:
-            raise UpdateFailed(f"Unerwarteter Fehler beim Verarbeiten der Daten: {err}") from err
+            raise UpdateFailed(f"Fehler beim Verarbeiten der AllEvents-Daten: {err}") from err
 
     def _filter_and_format_events(self, raw_items):
         """Filter events according to selected categories and format structure."""
         processed_events = []
 
         for item in raw_items:
-            title = item.get("title") or item.get("name", "Veranstaltung")
+            title = item.get("eventname") or item.get("title", "Veranstaltung")
             desc = item.get("description", "")
-            start_str = item.get("start_date") or item.get("startDate")
-            end_str = item.get("end_date") or item.get("endDate") or start_str
-            locality = item.get("location_name") or item.get("city", "")
+            
+            # AllEvents verwendet Unix-Timestamps oder ISO Strings
+            start_str = item.get("start_time") or item.get("start_date")
+            end_str = item.get("end_time") or item.get("end_date") or start_str
+            
+            venue = item.get("venue", {})
+            locality = venue.get("full_address") or venue.get("city") or item.get("location", "")
 
             title_lower = f"{title} {desc}".lower()
 
