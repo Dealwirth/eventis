@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for Eventis using Open Data."""
+"""DataUpdateCoordinator for Eventis using Public Open Data."""
 
 from datetime import datetime, timedelta
 import logging
@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class LocalEventsCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching event data from Open Data REST API."""
+    """Class to manage fetching event data from public Open Data API."""
 
     def __init__(self, hass: HomeAssistant, entry_data: dict):
         """Initialize coordinator."""
@@ -36,28 +36,39 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
         self.categories = entry_data.get(CONF_CATEGORIES, [])
 
     async def _async_update_data(self):
-        """Fetch events from public Open Data API."""
-        # Öffentlicher Open Data Endpunkt (ohne API-Key, Schema.org compliant)
-        url = "https://opendata.germany.travel/api/v1/events"
+        """Fetch events from public REST endpoint."""
+        # Öffentlicher Open Data Endpunkt ohne Auth-Redirect
+        url = "https://data.bayerncloud.digital/api/v4/endpoints/list_current_events"
+        
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "HomeAssistant-Eventis/1.0"
+        }
         
         params = {
             "lat": self.latitude,
             "lon": self.longitude,
-            "distance": self.radius,
-            "format": "json"
+            "radius": self.radius,
         }
 
         session = async_get_clientsession(self.hass)
 
         try:
-            async with session.get(url, params=params, timeout=15) as resp:
+            async with session.get(url, headers=headers, params=params, timeout=15) as resp:
+                # Prüfen, ob wir HTML statt JSON zurückbekommen (z.B. Redirects)
+                content_type = resp.headers.get("Content-Type", "")
+                if "application/json" not in content_type:
+                    _LOGGER.warning(
+                        "API gab keinen JSON-Inhalt zurück (Content-Type: %s).", content_type
+                    )
+                    return []
+
                 if resp.status != 200:
-                    _LOGGER.warning("Open Data API returned status %s.", resp.status)
+                    _LOGGER.warning("API returned status %s.", resp.status)
                     return []
 
                 data = await resp.json()
-                # Falls API ein Listen-Format oder 'data'-Wrapper nutzt:
-                raw_items = data if isinstance(data, list) else data.get("data", [])
+                raw_items = data.get("items", []) if isinstance(data, dict) else []
                 return self._filter_and_format_events(raw_items)
 
         except Exception as err:
@@ -74,18 +85,14 @@ class LocalEventsCoordinator(DataUpdateCoordinator):
             start_str = item.get("startDate") or item.get("start_date")
             end_str = item.get("endDate") or item.get("end_date") or start_str
             
-            # Standort-Parsing aus Schema.org Open Data
             location_data = item.get("location", {})
             locality = ""
             if isinstance(location_data, dict):
                 address = location_data.get("address", {})
                 locality = address.get("addressLocality") or address.get("city") or location_data.get("name", "")
-            elif isinstance(location_data, str):
-                locality = location_data
 
             title_lower = f"{title} {desc}".lower()
 
-            # Kategorie-Abgleich
             matched_cat = False
             if "wine" in self.categories and ("wein" in title_lower or "wine" in title_lower):
                 matched_cat = True
