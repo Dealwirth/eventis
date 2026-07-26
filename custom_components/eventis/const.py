@@ -1,8 +1,7 @@
-"""Constants for the Eventis integration."""
+"""Constants for the Eventis integration (Open Data Edition)."""
 
 DOMAIN = "eventis"
 
-CONF_API_KEY = "api_key"
 CONF_LATITUDE = "latitude"
 CONF_LONGITUDE = "longitude"
 CONF_RADIUS = "radius"
