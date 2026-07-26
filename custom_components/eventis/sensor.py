@@ -1,4 +1,4 @@
-"""Sensor platform for Local Event Radar."""
+"""Sensor platform for Eventis."""
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -7,28 +7,34 @@ from .const import DOMAIN
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up event count sensor."""
+    """Set up sensor entity."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([LocalEventsSensor(coordinator, entry)], True)
+    async_add_entities([EventisSensor(coordinator, entry)], True)
 
 
-class LocalEventsSensor(CoordinatorEntity, SensorEntity):
-    """Sensor displaying total number of upcoming events."""
+class EventisSensor(CoordinatorEntity, SensorEntity):
+    """Representation of an Eventis Event Counter Sensor."""
 
     def __init__(self, coordinator, entry):
-        """Initialize sensor."""
+        """Initialize the sensor."""
         super().__init__(coordinator)
-        self._attr_name = "Upcoming Local Events Count"
-        self._attr_unique_id = f"{entry.entry_id}_count_sensor"
-        self._attr_icon = "mdi:calendar-star"
+        self._attr_name = f"Eventis Anzahlsensor ({entry.data.get('radius')}km)"
+        self._attr_unique_id = f"{entry.entry_id}_event_count"
+        self._attr_icon = "mdi:calendar-multiselect"
+        self._attr_native_unit_of_measurement = "Events"
 
     @property
     def native_value(self):
-        """Return total upcoming events count."""
-        return len(self.coordinator.data) if self.coordinator.data else 0
+        """Return the total number of upcoming events."""
+        if not self.coordinator.data:
+            return 0
+        return len(self.coordinator.data)
 
     @property
     def extra_state_attributes(self):
-        """Return preview list of top 5 events."""
+        """Return additional attributes for the sensor."""
         events = self.coordinator.data or []
-        return {"next_events": events[:5]}
+        return {
+            "events_list": [evt.get("summary") for evt in events[:5]],
+            "last_updated": self.coordinator.last_update_success_time,
+        }
