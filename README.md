@@ -4,7 +4,6 @@ A custom Home Assistant integration that fetches local events, wine festivals, f
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?repository=https%3A%2F%2Fgithub.com%2FDealwirth%2Feventis&category=integration)
 
-![Icon](icon.png)
 
 ## Features
 - 📍 **Radius-based filtering**: Set your city/location and search radius in kilometers.
