@@ -1,0 +1,10 @@
+{
+  "domain": "local_events",
+  "name": "Local Event Radar",
+  "codeowners": ["@yourgithubusername"],
+  "config_flow": true,
+  "documentation": "https://github.com/yourgithubusername/ha-local-events",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/yourgithubusername/ha-local-events/issues",
+  "version": "1.0.0"
+}
