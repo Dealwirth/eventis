@@ -1,4 +1,4 @@
-"""Calendar platform for Local Event Radar."""
+"""Calendar platform for Eventis."""
 
 from datetime import datetime
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
@@ -10,16 +10,16 @@ from .const import DOMAIN
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up calendar entity."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([LocalEventsCalendar(coordinator, entry)], True)
+    async_add_entities([EventisCalendar(coordinator, entry)], True)
 
 
-class LocalEventsCalendar(CoordinatorEntity, CalendarEntity):
-    """Representation of a Local Events Calendar."""
+class EventisCalendar(CoordinatorEntity, CalendarEntity):
+    """Representation of an Eventis Calendar."""
 
     def __init__(self, coordinator, entry):
         """Initialize the calendar."""
         super().__init__(coordinator)
-        self._attr_name = f"Local Events ({entry.data.get('radius')}km)"
+        self._attr_name = f"Eventis ({entry.data.get('radius')}km)"
         self._attr_unique_id = f"{entry.entry_id}_calendar"
 
     @property
@@ -47,7 +47,8 @@ class LocalEventsCalendar(CoordinatorEntity, CalendarEntity):
             evt_start = datetime.fromisoformat(evt["start"])
             evt_end = datetime.fromisoformat(evt["end"])
 
-            if start_date <= evt_start <= end_date or start_date <= evt_end <= end_date:
+            # Fixed overlap condition
+            if (evt_start <= end_date) and (evt_end >= start_date):
                 results.append(
                     CalendarEvent(
                         summary=evt["summary"],
