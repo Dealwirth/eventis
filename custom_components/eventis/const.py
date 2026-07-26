@@ -8,15 +8,15 @@ CONF_LONGITUDE = "longitude"
 CONF_RADIUS = "radius"
 CONF_CATEGORIES = "categories"
 
-DEFAULT_RADIUS = 25  # in kilometers
-DEFAULT_SCAN_INTERVAL = 3600  # 1 hour
+DEFAULT_RADIUS = 25  # in Kilometern
+DEFAULT_SCAN_INTERVAL = 3600  # 1 Stunde (in Sekunden)
 
 EVENT_CATEGORIES = {
-    "wine": "Wine Festivals & Tastings",
-    "kirchweih": "Traditional Folk Festivals & Kirchweih",
-    "concert": "Concerts & Live Music",
-    "market": "Markets & Culinary Fairs",
-    "culture": "Culture, Theater & Exhibitions",
-    "family": "Family & Kids",
-    "sports": "Sports & Active Events",
+    "wine": "Weinfeste & Weinverkostungen",
+    "kirchweih": "Kirchweihen, Kerwa & Volksfeste",
+    "concert": "Konzerte & Live-Musik",
+    "market": "Märkte & Kulinarik",
+    "culture": "Kultur, Theater & Ausstellungen",
+    "family": "Familie & Kinder",
+    "sports": "Sport & Aktiv-Events",
 }
