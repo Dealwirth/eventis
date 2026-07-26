@@ -1,13 +1,13 @@
-"""Config flow for Local Event Radar integration."""
+"""Config flow for Eventis Integration (Open Data)."""
 
 import voluptuous as vol
+
 from homeassistant import config_entries
-import homeassistant.helpers.config_validation as cv
 from homeassistant.core import callback
+import homeassistant.helpers.config_validation as cv
 
 from .const import (
     DOMAIN,
-    CONF_API_KEY,
     CONF_LATITUDE,
     CONF_LONGITUDE,
     CONF_RADIUS,
@@ -17,54 +17,45 @@ from .const import (
 )
 
 
-class LocalEventsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Local Event Radar."""
+class EventisConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Eventis."""
 
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial setup step."""
-        errors = {}
-
+        """Handle the initial step."""
         if user_input is not None:
-            return self.async_create_entry(
-                title=f"Events ({user_input[CONF_RADIUS]} km)", data=user_input
-            )
+            return self.async_create_entry(title="Eventis Local Radar", data=user_input)
 
-        # Default coordinates from Home Assistant system location
+        # Standards: Home Assistant Breitengrad/Längengrad als Vorgabe
         default_lat = self.hass.config.latitude
         default_lon = self.hass.config.longitude
 
-        schema = vol.Schema(
+        data_schema = vol.Schema(
             {
-                vol.Required(CONF_API_KEY): str,
-                vol.Required(CONF_LATITUDE, default=default_lat): float,
-                vol.Required(CONF_LONGITUDE, default=default_lon): float,
+                vol.Required(CONF_LATITUDE, default=default_lat): cv.latitude,
+                vol.Required(CONF_LONGITUDE, default=default_lon): cv.longitude,
                 vol.Required(CONF_RADIUS, default=DEFAULT_RADIUS): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=200)
+                    vol.Coerce(int), vol.Range(min=1, max=100)
                 ),
-                vol.Required(
+                vol.Optional(
                     CONF_CATEGORIES, default=list(EVENT_CATEGORIES.keys())
                 ): cv.multi_select(EVENT_CATEGORIES),
             }
         )
 
-        return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
-        )
+        return self.async_show_form(step_id="user", data_schema=data_schema)
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        """Get the options flow for reconfiguring settings later."""
-        return LocalEventsOptionsFlowHandler(config_entry)
+        return EventisOptionsFlowHandler(config_entry)
 
 
-class LocalEventsOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options re-configuration."""
+class EventisOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options flow for Eventis."""
 
     def __init__(self, config_entry):
-        """Initialize options flow."""
         self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
@@ -72,20 +63,21 @@ class LocalEventsOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        current_data = {**self.config_entry.data, **self.config_entry.options}
+        current_config = {**self.config_entry.data, **self.config_entry.options}
 
-        schema = vol.Schema(
+        options_schema = vol.Schema(
             {
                 vol.Required(
-                    CONF_RADIUS, default=current_data.get(CONF_RADIUS, DEFAULT_RADIUS)
-                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=200)),
-                vol.Required(
+                    CONF_RADIUS,
+                    default=current_config.get(CONF_RADIUS, DEFAULT_RADIUS),
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+                vol.Optional(
                     CONF_CATEGORIES,
-                    default=current_data.get(
+                    default=current_config.get(
                         CONF_CATEGORIES, list(EVENT_CATEGORIES.keys())
                     ),
                 ): cv.multi_select(EVENT_CATEGORIES),
             }
         )
 
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="init", data_schema=options_schema)
