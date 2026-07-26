@@ -1,4 +1,4 @@
-"""The Local Event Radar Integration."""
+"""The Eventis Integration."""
 
 import logging
 from homeassistant.core import HomeAssistant
@@ -14,10 +14,9 @@ PLATFORMS = ["calendar", "sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Local Event Radar from a config entry."""
+    """Set up Eventis from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    # Combine config data and options
     config_data = {**entry.data, **entry.options}
 
     coordinator = LocalEventsCoordinator(hass, config_data)
@@ -25,14 +24,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register Custom Lovelace Dashboard Card automatically!
-    url_path = "/local_events/local-events-card.js"
+    # Register Custom Lovelace Dashboard Card automatically
+    url_path = "/eventis/local-events-card.js"
     hass.http.register_static_path(
         url_path,
-        hass.config.path("custom_components/local_events/www/local-events-card.js"),
+        hass.config.path("custom_components/eventis/www/local-events-card.js"),
         cache_headers=True,
     )
     add_extra_js_url(hass, url_path)
