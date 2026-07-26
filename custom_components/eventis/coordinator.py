@@ -1,9 +1,12 @@
-"""Config flow for Local Event Radar integration."""
+"""DataUpdateCoordinator for Eventis."""
 
-import voluptuous as vol
-from homeassistant import config_entries
-import homeassistant.helpers.config_validation as cv
-from homeassistant.core import callback
+from datetime import datetime, timedelta
+import logging
+import aiohttp
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN,
@@ -12,80 +15,94 @@ from .const import (
     CONF_LONGITUDE,
     CONF_RADIUS,
     CONF_CATEGORIES,
-    DEFAULT_RADIUS,
-    EVENT_CATEGORIES,
+    DEFAULT_SCAN_INTERVAL,
 )
 
+_LOGGER = logging.getLogger(__name__)
 
-class LocalEventsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Local Event Radar."""
 
-    VERSION = 1
+class LocalEventsCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching event data from BayernCloud API."""
 
-    async def async_step_user(self, user_input=None):
-        """Handle the initial setup step."""
-        errors = {}
-
-        if user_input is not None:
-            return self.async_create_entry(
-                title=f"Events ({user_input[CONF_RADIUS]} km)", data=user_input
-            )
-
-        # Default coordinates from Home Assistant system location
-        default_lat = self.hass.config.latitude
-        default_lon = self.hass.config.longitude
-
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_API_KEY): str,
-                vol.Required(CONF_LATITUDE, default=default_lat): float,
-                vol.Required(CONF_LONGITUDE, default=default_lon): float,
-                vol.Required(CONF_RADIUS, default=DEFAULT_RADIUS): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=200)
-                ),
-                vol.Required(
-                    CONF_CATEGORIES, default=list(EVENT_CATEGORIES.keys())
-                ): cv.multi_select(EVENT_CATEGORIES),
-            }
+    def __init__(self, hass: HomeAssistant, entry_data: dict):
+        """Initialize coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
+        self.api_key = entry_data.get(CONF_API_KEY)
+        self.latitude = entry_data.get(CONF_LATITUDE)
+        self.longitude = entry_data.get(CONF_LONGITUDE)
+        self.radius = entry_data.get(CONF_RADIUS)
+        self.categories = entry_data.get(CONF_CATEGORIES, [])
 
-        return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
-        )
+    async def _async_update_data(self):
+        """Fetch events from API."""
+        url = "https://data.bayerncloud.digital/api/v4/endpoints/list_current_events"
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        params = {
+            "lat": self.latitude,
+            "lon": self.longitude,
+            "radius": self.radius,
+        }
 
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry):
-        """Get the options flow for reconfiguring settings later."""
-        return LocalEventsOptionsFlowHandler(config_entry)
+        session = async_get_clientsession(self.hass)
 
+        try:
+            async with session.get(url, headers=headers, params=params, timeout=15) as resp:
+                if resp.status == 401:
+                    raise UpdateFailed("Invalid API Key for BayernCloud Tourismus")
+                if resp.status != 200:
+                    _LOGGER.warning("API returned status %s.", resp.status)
+                    return []
 
-class LocalEventsOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options re-configuration."""
+                data = await resp.json()
+                raw_items = data.get("items", [])
+                return self._filter_and_format_events(raw_items)
 
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
+        except Exception as err:
+            raise UpdateFailed(f"Error fetching event data: {err}") from err
 
-    async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+    def _filter_and_format_events(self, raw_items):
+        """Filter events according to selected categories and format structure."""
+        processed_events = []
 
-        current_data = {**self.config_entry.data, **self.config_entry.options}
+        for item in raw_items:
+            title = item.get("name", "Unknown Event")
+            desc = item.get("description", "")
+            start_str = item.get("startDate")
+            end_str = item.get("endDate", start_str)
+            location_info = item.get("location", {}).get("address", {})
+            locality = location_info.get("addressLocality", "")
 
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_RADIUS, default=current_data.get(CONF_RADIUS, DEFAULT_RADIUS)
-                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=200)),
-                vol.Required(
-                    CONF_CATEGORIES,
-                    default=current_data.get(
-                        CONF_CATEGORIES, list(EVENT_CATEGORIES.keys())
-                    ),
-                ): cv.multi_select(EVENT_CATEGORIES),
-            }
-        )
+            matched_cat = False
+            title_lower = (title + " " + desc).lower()
 
-        return self.async_show_form(step_id="init", data_schema=schema)
+            if "wine" in self.categories and ("wein" in title_lower or "wine" in title_lower):
+                matched_cat = True
+            elif "kirchweih" in self.categories and ("kerwa" in title_lower or "kirchweih" in title_lower or "kirmes" in title_lower or "volksfest" in title_lower):
+                matched_cat = True
+            elif "concert" in self.categories and ("konzert" in title_lower or "musik" in title_lower or "live" in title_lower):
+                matched_cat = True
+            elif "market" in self.categories and ("markt" in title_lower or "messen" in title_lower):
+                matched_cat = True
+            else:
+                matched_cat = True
+
+            if matched_cat and start_str:
+                processed_events.append(
+                    {
+                        "summary": title,
+                        "description": desc,
+                        "start": start_str,
+                        "end": end_str,
+                        "location": locality,
+                    }
+                )
+
+        return processed_events
