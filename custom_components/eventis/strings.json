@@ -2,9 +2,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Eventis Einrichtung (Open Data)",
-        "description": "Konfiguriere deinen Standort und den Suchradius für regionale Open Data Events.",
+        "title": "Eventis Einrichtung (AllEvents)",
+        "description": "Konfiguriere deinen AllEvents API-Schlüssel, deinen Standort und den Suchradius.",
         "data": {
+          "api_key": "AllEvents API-Schlüssel",
           "latitude": "Breitengrad (Latitude)",
           "longitude": "Längengrad (Longitude)",
           "radius": "Suchradius (in km)",
