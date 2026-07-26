@@ -6,7 +6,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.frontend import add_extra_js_url
 
 from .const import DOMAIN
-from .coordinator import LocalEventsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,6 +16,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Eventis from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
+    # Lokaler Import verhindert zirkuläre Abhängigkeiten
+    from .coordinator import LocalEventsCoordinator
+
     config_data = {**entry.data, **entry.options}
 
     coordinator = LocalEventsCoordinator(hass, config_data)
@@ -26,14 +28,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register Custom Lovelace Dashboard Card automatically
+    # Custom Lovelace Dashboard Card registrieren
     url_path = "/eventis/local-events-card.js"
-    hass.http.register_static_path(
-        url_path,
-        hass.config.path("custom_components/eventis/www/local-events-card.js"),
-        cache_headers=True,
-    )
-    add_extra_js_url(hass, url_path)
+    if url_path not in hass.data.get("frontend_extra_module_url", set()):
+        hass.http.register_static_path(
+            url_path,
+            hass.config.path("custom_components/eventis/www/local-events-card.js"),
+            cache_headers=True,
+        )
+        add_extra_js_url(hass, url_path)
 
     return True
 
